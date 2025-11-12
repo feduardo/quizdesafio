@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Teste seus conhecimentos com nosso quiz desafiador e entre no ranking dos melhores!">
+    <title>Quiz Desafio - Teste Seus Conhecimentos</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- SEÇÃO: INTRODUÇÃO -->
+    <section id="intro-section" class="section active">
+        <div class="container">
+            <div class="intro-content">
+                <h1>🎯 Desafio do Quiz</h1>
+                <p class="subtitle">Teste seus conhecimentos e entre no ranking dos TOP 10!</p>
+                
+                <div class="info-box">
+                    <div class="info-item">
+                        <span class="info-icon">📝</span>
+                        <span class="info-text"><strong>10 perguntas</strong> desafiadoras</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">⏱️</span>
+                        <span class="info-text"><strong>30 segundos</strong> por pergunta</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">🏆</span>
+                        <span class="info-text">Apareça no <strong>próximo vídeo</strong></span>
+                    </div>
+                </div>
+
+                <button id="start-btn" class="btn btn-primary btn-large">
+                    Começar o Desafio
+                </button>
+
+                <p class="disclaimer">
+                    Ao participar, você concorda em ter seu nome exibido no ranking público.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SEÇÃO: QUIZ -->
+    <section id="quiz-section" class="section">
+        <div class="container">
+            <div class="quiz-header">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <div class="quiz-info">
+                    <span id="question-counter">Pergunta 1 de 10</span>
+                    <span id="timer" class="timer">⏱️ 30s</span>
+                </div>
+            </div>
+
+            <div id="quiz-content" class="quiz-content">
+                <h2 id="question-text" class="question-text"></h2>
+                
+                <div id="options-container" class="options-container">
+                    <!-- As opções serão inseridas dinamicamente -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SEÇÃO: FORMULÁRIO (após completar o quiz) -->
+    <section id="form-section" class="section">
+        <div class="container">
+            <div class="form-content">
+                <div class="success-icon">✅</div>
+                <h2>Quiz Concluído!</h2>
+                <p class="subtitle">Você acertou <span id="temp-score" class="highlight-score">0</span> de 10 questões</p>
+                
+                <p class="form-instruction">
+                    Para ver seu resultado final e entrar no ranking, preencha os dados abaixo:
+                </p>
+
+                <form id="user-form" class="user-form">
+                    <div class="form-group">
+                        <label for="username">Nome ou Nome de Usuário *</label>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            required 
+                            minlength="3"
+                            maxlength="30"
+                            placeholder="Como você quer aparecer no ranking?"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">E-mail *</label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            required
+                            placeholder="seu@email.com"
+                        >
+                        <small class="form-hint">Não enviaremos spam. Apenas avisaremos quando você entrar no TOP 10!</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-large" id="submit-btn">
+                        Ver Meu Resultado
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- SEÇÃO: RESULTADO -->
+    <section id="result-section" class="section">
+        <div class="container">
+            <div class="result-content">
+                <div class="result-header">
+                    <div id="result-emoji" class="result-emoji">🎉</div>
+                    <h2 id="result-title">Parabéns!</h2>
+                    <p class="result-score">
+                        Você acertou <span id="final-score" class="highlight-score">0</span> de 10 questões
+                    </p>
+                    <p id="result-message" class="result-message"></p>
+                </div>
+
+                <!-- CTA PRINCIPAL DO LIVRO -->
+                <div class="cta-box">
+                    <h3>🚀 Quer dominar o assunto de vez?</h3>
+                    <p>Nosso livro contém <strong>500 questões</strong> como estas, com gabaritos comentados e estratégias de estudo!</p>
+                    
+                    <div class="book-options">
+                        <a href="https://www.amazon.com.br/dp/SEU_CODIGO_EBOOK" target="_blank" class="btn btn-primary btn-large" rel="noopener">
+                            📱 Comprar E-book
+                        </a>
+                        <a href="https://www.amazon.com.br/dp/SEU_CODIGO_FISICO" target="_blank" class="btn btn-secondary btn-large" rel="noopener">
+                            📚 Comprar Livro Físico
+                        </a>
+                    </div>
+
+                    <p class="cta-subtext">
+                        <span id="score-motivation"></span>
+                    </p>
+                </div>
+
+                <div class="share-section">
+                    <p class="share-text">Compartilhe seu resultado:</p>
+                    <div class="share-buttons">
+                        <button onclick="compartilharWhatsApp()" class="btn btn-share btn-whatsapp">
+                            WhatsApp
+                        </button>
+                        <button onclick="compartilharTwitter()" class="btn btn-share btn-twitter">
+                            Twitter
+                        </button>
+                        <button onclick="copiarLink()" class="btn btn-share btn-copy">
+                            Copiar Link
+                        </button>
+                    </div>
+                </div>
+
+                <div class="next-steps">
+                    <h3>🎬 Próximos Passos:</h3>
+                    <ul>
+                        <li>✅ Seu resultado foi registrado no sistema</li>
+                        <li>📺 O ranking TOP 10 será divulgado no próximo vídeo</li>
+                        <li>🔔 Ative as notificações do canal para não perder</li>
+                        <li>📧 Fique de olho no seu e-mail caso entre no ranking</li>
+                    </ul>
+                </div>
+
+                <button onclick="reiniciarQuiz()" class="btn btn-outline">
+                    🔄 Fazer Novo Quiz
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- SEÇÃO: LOADING -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Enviando seus dados...</p>
+    </div>
+
+    <!-- RODAPÉ COM ADSENSE -->
+    <footer class="footer">
+        <div class="container">
+            <!-- Google AdSense - Substitua pelo seu código real -->
+            <div class="ad-container">
+                <p class="ad-label">Publicidade</p>
+                <!-- 
+                    INSIRA SEU CÓDIGO DO GOOGLE ADSENSE AQUI
+                    Exemplo de formato:
+                    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXX"></script>
+                    <ins class="adsbygoogle"
+                         style="display:block"
+                         data-ad-client="ca-pub-XXXXXXX"
+                         data-ad-slot="XXXXXXX"
+                         data-ad-format="auto"></ins>
+                    <script>
+                         (adsbygoogle = window.adsbygoogle || []).push({});
+                    </script>
+                -->
+            </div>
+
+            <div class="footer-content">
+                <p>&copy; 2025 Quiz Desafio. Todos os direitos reservados.</p>
+                <div class="footer-links">
+                    <a href="https://www.youtube.com/@seucanal" target="_blank" rel="noopener">YouTube</a>
+                    <span>•</span>
+                    <a href="mailto:contato@exemplo.com">Contato</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
