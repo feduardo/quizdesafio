@@ -1,8 +1,18 @@
 // ===================================
-// CONFIGURAÇÃO
+// CONFIGURAÇÃO SUPABASE
 // ===================================
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxo_47Cq6RziLR1ov2QqLEQVGCfARz_FrJ2EfNTeu_tmKfOAyuIRhrHCNcfJFula6rF/exec';
+const SUPABASE_URL = 'https://xzxirbhraowknpgypnvx.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6eGlyYmhyYW93a25wZ3lwbnZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5NzY4MTMsImV4cCI6MjA3ODU1MjgxM30.AnbjQL0ut79NMsu2OyQYV2s5jBCMojBQ_ctVBdCQNy0';
+
+// ⚠️ IMPORTANTE: Estas credenciais SÃO SEGURAS de expor!
+// - SUPABASE_KEY é a chave PÚBLICA (anon key)
+// - Respostas corretas estão protegidas por RLS + PostgreSQL Functions
+// - Validação acontece NO SERVIDOR, não aqui
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Links
 const SITE_URL = 'https://feduardo.github.io/quizdesafio';
 const EBOOK_LINK = 'https://www.amazon.com.br/dp/B0G1L2J49T';
 const LIVRO_FISICO_LINK = 'https://www.amazon.com.br/dp/SEU_CODIGO_FISICO';
@@ -12,10 +22,10 @@ const LIVRO_FISICO_LINK = 'https://www.amazon.com.br/dp/SEU_CODIGO_FISICO';
 // ===================================
 
 let perguntas = [];
-let sessionId = '';
 let perguntaAtual = 0;
 let pontuacao = 0;
 let respostasUsuario = [];
+let sessionId = '';
 let timer;
 let tempoRestante = 30;
 let tempoTotalInicio = 0;
@@ -69,60 +79,68 @@ elements.startBtn.addEventListener('click', async () => {
     elements.startBtn.textContent = 'Carregando perguntas...';
     
     try {
-        // Gerar ID único para esta sessão
-        sessionId = 'quiz_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        // Gerar session ID único (mais robusto)
+        sessionId = `quiz_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
-        console.log('🔄 Carregando perguntas... Session:', sessionId);
+        console.log('🔄 Carregando perguntas do Supabase (via PostgreSQL Function)...');
         
-        // Carregar perguntas do backend
-        const response = await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'getQuestions',
-                session: sessionId
-            })
-        });
+        // Buscar perguntas usando PostgreSQL Function (SEM resposta_correta)
+        const { data, error } = await supabase.rpc('buscar_perguntas');
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (error) {
+            throw error;
         }
         
-        const data = await response.json();
-        console.log('✅ Resposta recebida:', data);
+        if (!data || data.length === 0) {
+            throw new Error('Nenhuma pergunta encontrada. Verifique se você executou o SQL de configuração.');
+        }
         
-        if (data.status === 'success' && data.perguntas) {
-            perguntas = data.perguntas;
-            perguntaAtual = 0;
-            pontuacao = 0;
-            respostasUsuario = [];
-            tempoTotalInicio = Date.now();
-            
-            console.log(`📝 ${perguntas.length} perguntas carregadas`);
-            
-            mostrarSecao('quiz');
-            exibirPergunta();
+        // Transformar para formato usado no código
+        perguntas = data.map(p => ({
+            id: p.id,
+            pergunta: p.pergunta,
+            opcoes: [p.opcao_a, p.opcao_b, p.opcao_c, p.opcao_d]
+        }));
+        
+        console.log(`✅ ${perguntas.length} perguntas carregadas (respostas protegidas)`);
+        
+        // Criar sessão no backend
+        const { error: sessionError } = await supabase
+            .from('sessoes_quiz')
+            .insert([{ 
+                session_id: sessionId,
+                ip_address: await getIpAddress()
+            }]);
+        
+        if (sessionError) {
+            console.warn('⚠️ Erro ao criar sessão:', sessionError);
+            // Continua mesmo sem sessão (para não bloquear usuário)
         } else {
-            throw new Error(data.message || 'Falha ao carregar perguntas');
+            console.log('✅ Sessão criada:', sessionId);
         }
+        
+        // Iniciar quiz
+        perguntaAtual = 0;
+        pontuacao = 0;
+        respostasUsuario = [];
+        tempoTotalInicio = Date.now();
+        
+        mostrarSecao('quiz');
+        exibirPergunta();
+        
     } catch (error) {
         console.error('❌ Erro ao carregar perguntas:', error);
         
-        let mensagemErro = 'Erro ao carregar o quiz.\n\n';
+        let mensagem = 'Erro ao carregar o quiz.\n\n';
         
-        if (error.message.includes('Failed to fetch')) {
-            mensagemErro += 'Possíveis causas:\n' +
-                          '1. Problema de conexão com a internet\n' +
-                          '2. Google Apps Script não foi implantado corretamente\n' +
-                          '3. URL do script está incorreta\n\n' +
-                          'Verifique o console (F12) para mais detalhes.';
+        if (error.message.includes('buscar_perguntas')) {
+            mensagem += 'A função PostgreSQL "buscar_perguntas" não foi encontrada.\n' +
+                       'Certifique-se de executar o SQL de configuração no Supabase.';
         } else {
-            mensagemErro += error.message;
+            mensagem += error.message;
         }
         
-        alert(mensagemErro);
+        alert(mensagem);
         elements.startBtn.disabled = false;
         elements.startBtn.textContent = 'Começar o Desafio';
     }
@@ -195,7 +213,7 @@ function pararTimer() {
 }
 
 // ===================================
-// SELECIONAR RESPOSTA
+// SELECIONAR RESPOSTA (VALIDAÇÃO SEGURA NO SERVIDOR)
 // ===================================
 
 async function selecionarResposta(indiceEscolhido) {
@@ -208,58 +226,54 @@ async function selecionarResposta(indiceEscolhido) {
     opcoes.forEach(btn => btn.disabled = true);
     
     try {
-        console.log(`🔍 Validando resposta ${indiceEscolhido} para pergunta ${perguntaAtual}`);
+        console.log(`🔍 Validando resposta no servidor (PostgreSQL Function)...`);
         
-        // Validar resposta no backend
-        const response = await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'validateAnswer',
-                session: sessionId,
-                perguntaIndex: perguntaAtual,
-                respostaIndex: indiceEscolhido
-            })
+        // Chamar PostgreSQL Function para validar (SERVIDOR)
+        const { data, error } = await supabase.rpc('validar_resposta', {
+            p_session_id: sessionId,
+            p_pergunta_id: pergunta.id,
+            p_resposta_index: indiceEscolhido
         });
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        if (error) {
+            throw error;
         }
         
-        const data = await response.json();
-        
-        if (data.status !== 'success') {
-            throw new Error(data.message || 'Erro ao validar resposta');
+        if (data.error) {
+            throw new Error(data.error);
         }
         
-        const respostaCorreta = data.correto;
-        const indiceCorreto = data.respostaCorreta;
+        const acertou = data.correto;
+        const indiceCorreto = data.resposta_correta;
+        const pontuacaoAtual = data.pontuacao_atual || pontuacao;
         
-        console.log(`${respostaCorreta ? '✅' : '❌'} Resposta ${respostaCorreta ? 'correta' : 'incorreta'}`);
+        console.log(`${acertou ? '✅' : '❌'} Resposta ${acertou ? 'correta' : 'incorreta'} | Pontuação: ${pontuacaoAtual}`);
+        
+        // Atualizar pontuação local
+        pontuacao = pontuacaoAtual;
         
         // Registrar resposta
         respostasUsuario.push({
             pergunta: pergunta.pergunta,
             escolhida: indiceEscolhido !== null ? pergunta.opcoes[indiceEscolhido] : 'Não respondeu',
             correta: pergunta.opcoes[indiceCorreto],
-            acertou: respostaCorreta
+            acertou: acertou
         });
-        
-        if (respostaCorreta) {
-            pontuacao++;
-        }
         
         // Mostrar feedback visual
         if (indiceEscolhido !== null) {
-            opcoes[indiceEscolhido].classList.add(respostaCorreta ? 'correct' : 'incorrect');
+            opcoes[indiceEscolhido].classList.add(acertou ? 'correct' : 'incorrect');
         }
         opcoes[indiceCorreto].classList.add('correct');
         
     } catch (error) {
         console.error('❌ Erro ao validar resposta:', error);
-        alert('Erro ao validar resposta. Continuando para próxima pergunta...');
+        alert(`Erro ao validar resposta: ${error.message}\n\nVerifique sua conexão e tente novamente.`);
+        
+        // Em caso de erro, permitir continuar (experiência do usuário)
+        if (indiceEscolhido !== null) {
+            opcoes[indiceEscolhido].classList.add('incorrect');
+        }
     }
     
     // Avançar para próxima pergunta após 2 segundos
@@ -273,7 +287,7 @@ async function selecionarResposta(indiceEscolhido) {
 // FINALIZAR QUIZ
 // ===================================
 
-function finalizarQuiz() {
+async function finalizarQuiz() {
     // Calcular tempo total
     const tempoTotalMs = Date.now() - tempoTotalInicio;
     tempoTotalSegundos = Math.floor(tempoTotalMs / 1000);
@@ -285,6 +299,22 @@ function finalizarQuiz() {
         : `${segundos}s`;
     
     console.log(`⏱️ Quiz finalizado em ${tempoFormatado}`);
+    console.log(`🎯 Pontuação: ${pontuacao}/${perguntas.length}`);
+    
+    // Marcar sessão como finalizada (previne múltiplas tentativas)
+    try {
+        await supabase
+            .from('sessoes_quiz')
+            .update({ 
+                finalizado: true,
+                finalizado_at: new Date().toISOString()
+            })
+            .eq('session_id', sessionId);
+        
+        console.log('✅ Sessão finalizada');
+    } catch (error) {
+        console.warn('⚠️ Erro ao finalizar sessão:', error);
+    }
     
     elements.tempScore.textContent = pontuacao;
     mostrarSecao('form');
@@ -322,74 +352,81 @@ elements.userForm.addEventListener('submit', async (e) => {
             ? `${minutos}min ${segundos}s` 
             : `${segundos}s`;
         
-        // Preparar dados para envio
+        // Preparar dados
         const dados = {
-            action: 'submitResults',
             nome: username,
             email: email,
             pontuacao: pontuacao,
             total: perguntas.length,
-            percentual: ((pontuacao / perguntas.length) * 100).toFixed(1),
-            data: new Date().toISOString(),
-            tempoSegundos: tempoTotalSegundos,
-            tempoFormatado: tempoFormatado,
-            respostas: respostasUsuario
+            percentual: parseFloat(((pontuacao / perguntas.length) * 100).toFixed(1)),
+            tempo_segundos: tempoTotalSegundos,
+            tempo_formatado: tempoFormatado,
+            session_id: sessionId,
+            ip_address: await getIpAddress(),
+            user_agent: navigator.userAgent
         };
         
-        console.log('📤 Enviando resultados:', dados);
+        console.log('📤 Salvando resultado no Supabase:', dados);
         
-        // Enviar para Google Sheets
-        const response = await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(dados)
-        });
+        // Inserir resultado
+        const { data, error } = await supabase
+            .from('resultados_quiz')
+            .insert([dados])
+            .select();
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        if (error) {
+            throw error;
         }
         
-        const result = await response.json();
-        console.log('✅ Dados enviados com sucesso!', result);
+        console.log('✅ Resultado salvo com sucesso!', data);
         
-        // Salvar no localStorage como backup
+        // Backup local
         salvarResultadoLocal(dados);
         
         // Exibir resultado
         exibirResultado(username);
         
     } catch (error) {
-        console.error('❌ Erro ao enviar dados:', error);
+        console.error('❌ Erro ao salvar resultado:', error);
         
         // Salvar localmente mesmo com erro
         salvarResultadoLocal({
             nome: username,
             email: email,
             pontuacao: pontuacao,
-            total: perguntas.length,
-            data: new Date().toISOString()
+            total: perguntas.length
         });
         
-        // Mostrar aviso mas continuar
-        console.warn('⚠️ Resultado salvo localmente. Erro ao enviar para servidor.');
-        
-        // Continuar para resultado
+        alert('⚠️ Não foi possível salvar no servidor.\nSeu resultado foi registrado localmente.');
         exibirResultado(username);
+        
     } finally {
         elements.loadingOverlay.classList.remove('active');
     }
 });
 
 // ===================================
-// SALVAR NO LOCALSTORAGE
+// FUNÇÕES AUXILIARES
 // ===================================
+
+async function getIpAddress() {
+    try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        return data.ip;
+    } catch (error) {
+        console.warn('⚠️ Não foi possível obter IP:', error);
+        return null;
+    }
+}
 
 function salvarResultadoLocal(dados) {
     try {
         const resultadosAnteriores = JSON.parse(localStorage.getItem('quizResultados')) || [];
-        resultadosAnteriores.push(dados);
+        resultadosAnteriores.push({
+            ...dados,
+            data: new Date().toISOString()
+        });
         localStorage.setItem('quizResultados', JSON.stringify(resultadosAnteriores));
         console.log('💾 Resultado salvo no localStorage');
     } catch (error) {
@@ -408,17 +445,17 @@ function exibirResultado(username) {
     
     const percentual = (pontuacao / perguntas.length) * 100;
     
-    // Personalizar mensagem baseada no desempenho
+    // Personalizar mensagem
     if (percentual === 100) {
         elements.resultEmoji.textContent = '🏆';
         elements.resultTitle.textContent = 'PERFEITO!';
-        elements.resultMessage.textContent = `${username}, você arrasou! Nota máxima! Você está entre os melhores!`;
+        elements.resultMessage.textContent = `${username}, você arrasou! Nota máxima!`;
         elements.scoreMotivation.textContent = '🔥 Com o livro completo, você dominará totalmente o assunto!';
     } else if (percentual >= 80) {
         elements.resultEmoji.textContent = '🎉';
         elements.resultTitle.textContent = 'Excelente!';
-        elements.resultMessage.textContent = `${username}, parabéns! Você está muito bem preparado!`;
-        elements.scoreMotivation.textContent = '📈 Treine mais 490 questões no livro e chegue à perfeição!';
+        elements.resultMessage.textContent = `${username}, parabéns! Você está muito bem!`;
+        elements.scoreMotivation.textContent = '📈 Treine mais 490 questões no livro!';
     } else if (percentual >= 60) {
         elements.resultEmoji.textContent = '👍';
         elements.resultTitle.textContent = 'Bom trabalho!';
@@ -427,16 +464,16 @@ function exibirResultado(username) {
     } else if (percentual >= 40) {
         elements.resultEmoji.textContent = '💪';
         elements.resultTitle.textContent = 'Continue Praticando!';
-        elements.resultMessage.textContent = `${username}, você tem potencial! Precisa treinar mais.`;
-        elements.scoreMotivation.textContent = '🎯 Nosso livro tem 500 questões para você dominar o conteúdo!';
+        elements.resultMessage.textContent = `${username}, você tem potencial!`;
+        elements.scoreMotivation.textContent = '🎯 Nosso livro tem 500 questões!';
     } else {
         elements.resultEmoji.textContent = '📖';
         elements.resultTitle.textContent = 'Não desista!';
-        elements.resultMessage.textContent = `${username}, todos começam de algum lugar. Vamos estudar juntos!`;
-        elements.scoreMotivation.textContent = '🚀 Comece pelo básico com nosso livro e evolua rapidamente!';
+        elements.resultMessage.textContent = `${username}, todos começam de algum lugar!`;
+        elements.scoreMotivation.textContent = '🚀 Comece pelo básico com nosso livro!';
     }
     
-    // Atualizar links dos livros
+    // Atualizar links
     const ebookBtn = document.querySelector('.btn-primary[href*="amazon"]');
     const fisicoBtn = document.querySelector('.btn-secondary[href*="amazon"]');
     
@@ -452,30 +489,28 @@ function reiniciarQuiz() {
     perguntaAtual = 0;
     pontuacao = 0;
     respostasUsuario = [];
+    perguntas = [];
     mostrarSecao('intro');
 }
 
 // ===================================
-// FUNÇÕES DE COMPARTILHAMENTO
+// COMPARTILHAMENTO
 // ===================================
 
 function compartilharWhatsApp() {
-    const texto = `Acabei de fazer o Quiz Desafio e acertei ${pontuacao} de ${perguntas.length} perguntas! 🎯 Será que você consegue fazer melhor? Teste agora: ${SITE_URL}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
-    window.open(url, '_blank');
+    const texto = `Acabei de fazer o Quiz Desafio e acertei ${pontuacao} de ${perguntas.length} perguntas! 🎯 Teste agora: ${SITE_URL}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
 }
 
 function compartilharTwitter() {
-    const texto = `Acabei de fazer o Quiz Desafio e acertei ${pontuacao} de ${perguntas.length}! 🎯 Você consegue fazer melhor?`;
-    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(texto)}&url=${encodeURIComponent(SITE_URL)}`;
-    window.open(url, '_blank');
+    const texto = `Acertei ${pontuacao} de ${perguntas.length} no Quiz Desafio! 🎯`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(texto)}&url=${encodeURIComponent(SITE_URL)}`, '_blank');
 }
 
 function copiarLink() {
     navigator.clipboard.writeText(SITE_URL).then(() => {
-        alert('Link copiado para a área de transferência! 📋');
-    }).catch(err => {
-        console.error('Erro ao copiar:', err);
+        alert('Link copiado! 📋');
+    }).catch(() => {
         const textarea = document.createElement('textarea');
         textarea.value = SITE_URL;
         document.body.appendChild(textarea);
@@ -487,10 +522,15 @@ function copiarLink() {
 }
 
 // ===================================
-// LOGS PARA DEBUG
+// VERIFICAÇÃO INICIAL
 // ===================================
 
-console.log('✅ Quiz carregado com sucesso!');
-console.log(`⏱️ Tempo por pergunta: ${TEMPO_POR_PERGUNTA}s`);
-console.log('🔗 Google Script URL:', GOOGLE_SCRIPT_URL);
-console.log('📝 Versão: 2.1 - CORS Corrigido');
+if (SUPABASE_URL === 'https://SEU_PROJETO.supabase.co') {
+    console.error('⚠️ CONFIGURE SUPABASE_URL e SUPABASE_KEY!');
+} else {
+    console.log('✅ Quiz Seguro carregado!');
+    console.log('🔐 Respostas protegidas por PostgreSQL Functions');
+    console.log('⚡ Validação server-side');
+}
+
+console.log(`📝 ${TEMPO_POR_PERGUNTA}s por pergunta`);
