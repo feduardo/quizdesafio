@@ -3,7 +3,7 @@
 // ===================================
 
 // IMPORTANTE: Substitua esta URL pela URL do seu Google Apps Script Web App
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx_XFSD_Fyds_WWQ4_urRoI5KTqjqCfcEL-AZGsZDvpRIzT1yayWo5fXBUYKVriVcOC/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwrwNuZsj1kWhHr0DmDPWBV6R3NAe8NmwXySvoQ1uLWgi5SXOzdOdsW9qbPKcEE3b6f/exec';
 
 // Link do seu site (para compartilhamento)
 const SITE_URL = 'https://feduardo.github.io/quizdesafio';
