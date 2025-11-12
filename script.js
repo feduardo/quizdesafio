@@ -3,7 +3,7 @@
 // ===================================
 
 // IMPORTANTE: Substitua esta URL pela URL do seu Google Apps Script Web App
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwrwNuZsj1kWhHr0DmDPWBV6R3NAe8NmwXySvoQ1uLWgi5SXOzdOdsW9qbPKcEE3b6f/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxo_47Cq6RziLR1ov2QqLEQVGCfARz_FrJ2EfNTeu_tmKfOAyuIRhrHCNcfJFula6rF/exec';
 
 // Link do seu site (para compartilhamento)
 const SITE_URL = 'https://feduardo.github.io/quizdesafio';
@@ -83,7 +83,14 @@ elements.startBtn.addEventListener('click', async () => {
         sessionId = 'quiz_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         
         // Carregar perguntas do backend
-        const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getQuestions&session=${sessionId}`);
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'getQuestions',
+            session: sessionId
+          })
+        });
         const data = await response.json();
         
         if (data.status === 'success' && data.perguntas) {
