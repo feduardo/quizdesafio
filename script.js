@@ -6,7 +6,7 @@
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmKSXKHctOK2uuF9hbdVcTnJ65RDc08xSrZKotD-fkB-D254RdaUDnlOfsrZvaRZYh/exec';
 
 // Link do seu site (para compartilhamento)
-const SITE_URL = 'https://seuusuario.github.io/quizdesafio';
+const SITE_URL = 'https://feduardo.github.io/quizdesafio';
 
 // Links dos seus livros na Amazon
 const EBOOK_LINK = 'https://www.amazon.com.br/dp/B0G1L2J49T';
