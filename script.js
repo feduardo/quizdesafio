@@ -286,14 +286,11 @@ elements.userForm.addEventListener('submit', async (e) => {
         
         // Enviar para Google Sheets
         const response = await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(dados)
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'getQuestions', session: sessionId })
         });
-        
+                
         console.log('Dados enviados com sucesso!', dados);
         
         // Salvar no localStorage como backup
