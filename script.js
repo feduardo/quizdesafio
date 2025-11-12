@@ -2,35 +2,25 @@
 // CONFIGURAÇÃO
 // ===================================
 
-// IMPORTANTE: Substitua esta URL pela URL do seu Google Apps Script Web App
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxo_47Cq6RziLR1ov2QqLEQVGCfARz_FrJ2EfNTeu_tmKfOAyuIRhrHCNcfJFula6rF/exec';
-
-// Link do seu site (para compartilhamento)
 const SITE_URL = 'https://feduardo.github.io/quizdesafio';
-
-// Links dos seus livros na Amazon
 const EBOOK_LINK = 'https://www.amazon.com.br/dp/B0G1L2J49T';
 const LIVRO_FISICO_LINK = 'https://www.amazon.com.br/dp/SEU_CODIGO_FISICO';
-
-// ===================================
-// BANCO DE PERGUNTAS
-// ===================================
-
-// As perguntas agora são carregadas do backend (Google Apps Script)
-// Isso impede que usuários vejam as respostas corretas no código
-let perguntas = [];
-let sessionId = ''; // ID único da sessão para validação no backend
 
 // ===================================
 // VARIÁVEIS GLOBAIS
 // ===================================
 
+let perguntas = [];
+let sessionId = '';
 let perguntaAtual = 0;
 let pontuacao = 0;
 let respostasUsuario = [];
 let timer;
 let tempoRestante = 30;
-const TEMPO_POR_PERGUNTA = 30; // segundos
+let tempoTotalInicio = 0;
+let tempoTotalSegundos = 0;
+const TEMPO_POR_PERGUNTA = 30;
 
 // ===================================
 // ELEMENTOS DO DOM
@@ -79,33 +69,60 @@ elements.startBtn.addEventListener('click', async () => {
     elements.startBtn.textContent = 'Carregando perguntas...';
     
     try {
-        // Gerar ID único para esta sessão (evita manipulação)
+        // Gerar ID único para esta sessão
         sessionId = 'quiz_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
+        console.log('🔄 Carregando perguntas... Session:', sessionId);
         
         // Carregar perguntas do backend
         const response = await fetch(GOOGLE_SCRIPT_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'getQuestions',
-            session: sessionId
-          })
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'getQuestions',
+                session: sessionId
+            })
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
+        console.log('✅ Resposta recebida:', data);
         
         if (data.status === 'success' && data.perguntas) {
             perguntas = data.perguntas;
             perguntaAtual = 0;
             pontuacao = 0;
             respostasUsuario = [];
+            tempoTotalInicio = Date.now();
+            
+            console.log(`📝 ${perguntas.length} perguntas carregadas`);
+            
             mostrarSecao('quiz');
             exibirPergunta();
         } else {
-            throw new Error('Falha ao carregar perguntas');
+            throw new Error(data.message || 'Falha ao carregar perguntas');
         }
     } catch (error) {
-        console.error('Erro ao carregar perguntas:', error);
-        alert('Erro ao carregar o quiz. Verifique sua conexão e tente novamente.');
+        console.error('❌ Erro ao carregar perguntas:', error);
+        
+        let mensagemErro = 'Erro ao carregar o quiz.\n\n';
+        
+        if (error.message.includes('Failed to fetch')) {
+            mensagemErro += 'Possíveis causas:\n' +
+                          '1. Problema de conexão com a internet\n' +
+                          '2. Google Apps Script não foi implantado corretamente\n' +
+                          '3. URL do script está incorreta\n\n' +
+                          'Verifique o console (F12) para mais detalhes.';
+        } else {
+            mensagemErro += error.message;
+        }
+        
+        alert(mensagemErro);
         elements.startBtn.disabled = false;
         elements.startBtn.textContent = 'Começar o Desafio';
     }
@@ -163,7 +180,7 @@ function iniciarTimer() {
         
         if (tempoRestante <= 0) {
             clearInterval(timer);
-            selecionarResposta(null); // Timeout - nenhuma resposta
+            selecionarResposta(null);
         }
     }, 1000);
 }
@@ -191,22 +208,36 @@ async function selecionarResposta(indiceEscolhido) {
     opcoes.forEach(btn => btn.disabled = true);
     
     try {
+        console.log(`🔍 Validando resposta ${indiceEscolhido} para pergunta ${perguntaAtual}`);
+        
         // Validar resposta no backend
-        const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=validateAnswer`, {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
+                action: 'validateAnswer',
                 session: sessionId,
                 perguntaIndex: perguntaAtual,
                 respostaIndex: indiceEscolhido
             })
         });
         
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
         const data = await response.json();
+        
+        if (data.status !== 'success') {
+            throw new Error(data.message || 'Erro ao validar resposta');
+        }
+        
         const respostaCorreta = data.correto;
         const indiceCorreto = data.respostaCorreta;
+        
+        console.log(`${respostaCorreta ? '✅' : '❌'} Resposta ${respostaCorreta ? 'correta' : 'incorreta'}`);
         
         // Registrar resposta
         respostasUsuario.push({
@@ -227,9 +258,8 @@ async function selecionarResposta(indiceEscolhido) {
         opcoes[indiceCorreto].classList.add('correct');
         
     } catch (error) {
-        console.error('Erro ao validar resposta:', error);
-        // Em caso de erro, apenas continua
-        alert('Erro ao validar resposta. Continuando...');
+        console.error('❌ Erro ao validar resposta:', error);
+        alert('Erro ao validar resposta. Continuando para próxima pergunta...');
     }
     
     // Avançar para próxima pergunta após 2 segundos
@@ -244,6 +274,18 @@ async function selecionarResposta(indiceEscolhido) {
 // ===================================
 
 function finalizarQuiz() {
+    // Calcular tempo total
+    const tempoTotalMs = Date.now() - tempoTotalInicio;
+    tempoTotalSegundos = Math.floor(tempoTotalMs / 1000);
+    
+    const minutos = Math.floor(tempoTotalSegundos / 60);
+    const segundos = tempoTotalSegundos % 60;
+    const tempoFormatado = minutos > 0 
+        ? `${minutos}min ${segundos}s` 
+        : `${segundos}s`;
+    
+    console.log(`⏱️ Quiz finalizado em ${tempoFormatado}`);
+    
     elements.tempScore.textContent = pontuacao;
     mostrarSecao('form');
 }
@@ -273,25 +315,44 @@ elements.userForm.addEventListener('submit', async (e) => {
     elements.loadingOverlay.classList.add('active');
     
     try {
+        // Calcular tempo formatado
+        const minutos = Math.floor(tempoTotalSegundos / 60);
+        const segundos = tempoTotalSegundos % 60;
+        const tempoFormatado = minutos > 0 
+            ? `${minutos}min ${segundos}s` 
+            : `${segundos}s`;
+        
         // Preparar dados para envio
         const dados = {
+            action: 'submitResults',
             nome: username,
             email: email,
             pontuacao: pontuacao,
             total: perguntas.length,
             percentual: ((pontuacao / perguntas.length) * 100).toFixed(1),
             data: new Date().toISOString(),
+            tempoSegundos: tempoTotalSegundos,
+            tempoFormatado: tempoFormatado,
             respostas: respostasUsuario
         };
         
+        console.log('📤 Enviando resultados:', dados);
+        
         // Enviar para Google Sheets
         const response = await fetch(GOOGLE_SCRIPT_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'getQuestions', session: sessionId })
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dados)
         });
-                
-        console.log('Dados enviados com sucesso!', dados);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Dados enviados com sucesso!', result);
         
         // Salvar no localStorage como backup
         salvarResultadoLocal(dados);
@@ -300,7 +361,7 @@ elements.userForm.addEventListener('submit', async (e) => {
         exibirResultado(username);
         
     } catch (error) {
-        console.error('Erro ao enviar dados:', error);
+        console.error('❌ Erro ao enviar dados:', error);
         
         // Salvar localmente mesmo com erro
         salvarResultadoLocal({
@@ -311,7 +372,10 @@ elements.userForm.addEventListener('submit', async (e) => {
             data: new Date().toISOString()
         });
         
-        // Continuar para resultado mesmo com erro de envio
+        // Mostrar aviso mas continuar
+        console.warn('⚠️ Resultado salvo localmente. Erro ao enviar para servidor.');
+        
+        // Continuar para resultado
         exibirResultado(username);
     } finally {
         elements.loadingOverlay.classList.remove('active');
@@ -327,8 +391,9 @@ function salvarResultadoLocal(dados) {
         const resultadosAnteriores = JSON.parse(localStorage.getItem('quizResultados')) || [];
         resultadosAnteriores.push(dados);
         localStorage.setItem('quizResultados', JSON.stringify(resultadosAnteriores));
+        console.log('💾 Resultado salvo no localStorage');
     } catch (error) {
-        console.error('Erro ao salvar no localStorage:', error);
+        console.error('❌ Erro ao salvar no localStorage:', error);
     }
 }
 
@@ -371,7 +436,7 @@ function exibirResultado(username) {
         elements.scoreMotivation.textContent = '🚀 Comece pelo básico com nosso livro e evolua rapidamente!';
     }
     
-    // Atualizar links dos livros nos botões (caso tenha múltiplas páginas de livros)
+    // Atualizar links dos livros
     const ebookBtn = document.querySelector('.btn-primary[href*="amazon"]');
     const fisicoBtn = document.querySelector('.btn-secondary[href*="amazon"]');
     
@@ -411,7 +476,6 @@ function copiarLink() {
         alert('Link copiado para a área de transferência! 📋');
     }).catch(err => {
         console.error('Erro ao copiar:', err);
-        // Fallback para navegadores antigos
         const textarea = document.createElement('textarea');
         textarea.value = SITE_URL;
         document.body.appendChild(textarea);
@@ -427,6 +491,6 @@ function copiarLink() {
 // ===================================
 
 console.log('✅ Quiz carregado com sucesso!');
-console.log(`📊 Total de perguntas: ${perguntas.length}`);
-console.log(`⚙️ Tempo por pergunta: ${TEMPO_POR_PERGUNTA}s`);
-console.log('🔧 Lembre-se de configurar o GOOGLE_SCRIPT_URL no início do arquivo!');
+console.log(`⏱️ Tempo por pergunta: ${TEMPO_POR_PERGUNTA}s`);
+console.log('🔗 Google Script URL:', GOOGLE_SCRIPT_URL);
+console.log('📝 Versão: 2.1 - CORS Corrigido');
